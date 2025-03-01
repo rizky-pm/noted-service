@@ -1,0 +1,40 @@
+# 🛠 Node Modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 🏗 TypeScript Build Output
+dist/
+build/
+*.tsbuildinfo
+
+# 🔥 Environment Variables
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# 🚀 Fastify Logs
+logs/
+*.log
+logs/*.log
+
+# ⚙️ Debugging
+.vscode/
+*.swp
+*.swo
+*.swn
+.idea/
+
+# 🏗 Temporary Files
+*.tmp
+*.cache
+.DS_Store
+Thumbs.db
+
+# 📜 Mongoose Data (Optional)
+dump/
+data/
