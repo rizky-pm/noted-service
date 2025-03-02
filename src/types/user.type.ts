@@ -1,3 +1,9 @@
+export interface IJwtUser {
+  userId: string;
+  iat: number;
+  exp: number;
+}
+
 export interface IUser {
   _id?: string;
   username: string;

@@ -6,7 +6,7 @@ export const getUserCollection = (
   server: FastifyInstance
 ): Collection<IUser> => {
   if (!server.mongo.db) {
-    throw new Error('MongoDB is not connected!');
+    throw new Error('Failed to connect to User Collection');
   }
 
   return server.mongo.db.collection<IUser>('users');
