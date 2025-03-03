@@ -17,7 +17,6 @@ export default fp(async (fastify: FastifyInstance) => {
         if (!token) throw new Error('No token provided');
 
         request.user = await request.server.jwt.verify<IJwtUser>(token);
-        console.log('Decoded User:', request.user);
       } catch (err) {
         return reply.status(401).send(errorResponse('Unauthorized', 401));
       }

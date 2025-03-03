@@ -67,7 +67,7 @@ export const loginUser = async (
     { userId: user._id },
     { expiresIn: '7d' }
   );
-  console.log(refreshToken);
+
   reply
     .setCookie('refreshToken', refreshToken, {
       httpOnly: true,
