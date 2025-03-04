@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.route';
 import authPlugin from './plugins/auth.plugin';
 import { successResponse } from './helpers/response.helper';
 import noteRoutes from './routes/note.route';
+import tagRoutes from './routes/tag.route';
 
 const fastify = Fastify().withTypeProvider<TypeBoxTypeProvider>();
 
@@ -27,6 +28,7 @@ fastify.register(authPlugin);
 // Register routes
 fastify.register(authRoutes);
 fastify.register(noteRoutes);
+fastify.register(tagRoutes);
 
 fastify.get('/check-health', async (request, reply) => {
   return reply.send(

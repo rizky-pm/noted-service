@@ -18,6 +18,6 @@ export const errorResponse = <T = null>(
 ): BaseResponse<T> => ({
   status: 'error',
   message: message ?? 'Oops, something went wrong.',
-  code: code ?? 400,
+  code: code ?? 500,
   ...(data !== undefined ? { data } : {}),
 });

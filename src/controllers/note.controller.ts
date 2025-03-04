@@ -276,12 +276,13 @@ export const deleteNoteById = async (
     }
 
     const notesCollection = getNoteCollection(request.server);
-    const deleteResult = await notesCollection.deleteOne({
+
+    const note = await notesCollection.findOne({
       _id: new ObjectId(noteId),
       ownerId: userId,
     });
 
-    if (deleteResult.deletedCount === 0) {
+    if (!note) {
       return reply.send(
         errorResponse(
           REQUEST_ERROR.notFound.message,
@@ -290,12 +291,15 @@ export const deleteNoteById = async (
       );
     }
 
+    await notesCollection.deleteOne({
+      _id: new ObjectId(noteId),
+      ownerId: userId,
+    });
+
     return reply.send(
-      successResponse(
-        `Note with id ${noteId} successfully deleted`,
-        undefined,
-        { noteId }
-      )
+      successResponse(`Note '${note.title}' successfully deleted`, undefined, {
+        noteId,
+      })
     );
   } catch (error) {
     console.error(error);
