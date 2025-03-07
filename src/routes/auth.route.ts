@@ -3,6 +3,7 @@ import {
   registerUser,
   loginUser,
   logoutUser,
+  getAuthenticatedUser,
 } from '../controllers/auth.controller';
 
 export default async function authRoutes(server: FastifyInstance) {
@@ -12,5 +13,10 @@ export default async function authRoutes(server: FastifyInstance) {
     '/api/v1/auth/logout',
     { preHandler: server.authenticate },
     logoutUser
+  );
+  server.get(
+    '/api/v1/auth/me',
+    { preHandler: server.authenticate },
+    getAuthenticatedUser
   );
 }

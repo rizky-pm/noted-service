@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import '@fastify/session';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -8,7 +9,19 @@ declare module 'fastify' {
     ) => Promise<void>;
   }
 
+  interface Session {
+    user: {
+      id: string;
+      username: string;
+      email: string;
+    };
+  }
+
   interface FastifyRequest {
-    user: JwtUser;
+    user: {
+      userId: string;
+      username: string;
+      email: string;
+    };
   }
 }

@@ -51,38 +51,51 @@ export const loginUser = async (
   const userCollection = getUserCollection(request.server);
   const user = await userCollection.findOne({ username });
 
-  if (!user)
-    return reply.send(errorResponse('Invalid username or password', 401));
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    return reply
+      .status(401)
+      .send({ message: 'Invalid username or password', code: 401 });
+  }
 
-  const isValid = await bcrypt.compare(password, user.password);
+  request.session.user = {
+    id: user._id.toString(),
+    username: user.username,
+    email: user.email,
+  };
 
-  if (!isValid)
-    return reply.send(errorResponse('Invalid username or password', 401));
-
-  const accessToken = request.server.jwt.sign(
-    { userId: user._id },
-    { expiresIn: '15m' }
-  );
-  const refreshToken = request.server.jwt.sign(
-    { userId: user._id },
-    { expiresIn: '7d' }
-  );
-
-  reply
-    .setCookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-    })
-    .send(successResponse('Login successfull!', 200, { accessToken }));
+  return reply
+    .status(200)
+    .send(successResponse('Login successful!', 200, request.session.user));
 };
 
 export const logoutUser = async (
   request: FastifyRequest,
   reply: FastifyReply
 ) => {
-  return reply
-    .clearCookie('refreshToken')
-    .send(successResponse('Logout successfull!'));
+  request.session.destroy((err) => {
+    if (err) {
+      console.error('Logout Error:', err);
+      return reply.status(500).send({ message: 'Failed to logout' });
+    }
+    return reply.send(successResponse('Logout successful!', 200));
+  });
+};
+
+export const getAuthenticatedUser = async (
+  request: FastifyRequest,
+  reply: FastifyReply
+) => {
+  if (!request.session.user) {
+    return reply.status(401).send({
+      code: 401,
+      message: 'Unauthorized',
+      status: 'error',
+    });
+  }
+
+  return reply.status(200).send({
+    id: request.session.user.id,
+    username: request.session.user.username,
+    email: request.session.user.email,
+  });
 };
