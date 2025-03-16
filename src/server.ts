@@ -36,6 +36,7 @@ fastify.register(fastifySession, {
     path: '/',
   },
   saveUninitialized: false,
+  rolling: true,
 });
 
 fastify.decorate(

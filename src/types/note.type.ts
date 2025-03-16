@@ -14,12 +14,17 @@ export interface IGetAllNotes {
   queryString: {
     page?: string;
     limit?: string;
+    sort?: 'ASC' | 'DESC';
   };
 }
 
 export interface ICreateNewNote {
   title: string;
-  tag: string;
+  tag: {
+    id: string;
+    code: string;
+    label: string;
+  };
   content: string;
 }
 

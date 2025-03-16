@@ -18,7 +18,9 @@ export const registerUser = async (
   });
 
   if (existingUser) {
-    return reply.send(errorResponse('Email or username already exists'));
+    return reply
+      .status(400)
+      .send(errorResponse('Email or username already exists'));
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);

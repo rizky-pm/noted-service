@@ -14,17 +14,19 @@ export const createNewTag = async (
   reply: FastifyReply
 ) => {
   try {
-    const userId = request.user.userId;
+    const userId = request.session.user.id;
     const { value } = request.body;
     const tagsCollection = getTagCollection(request.server);
 
     if (!value) {
-      return reply.send(
-        errorResponse(
-          `${REQUEST_ERROR.badRequest.message}, tag name is required`,
-          REQUEST_ERROR.badRequest.code
-        )
-      );
+      return reply
+        .status(REQUEST_ERROR.badRequest.code)
+        .send(
+          errorResponse(
+            `${REQUEST_ERROR.badRequest.message}, tag name is required`,
+            REQUEST_ERROR.badRequest.code
+          )
+        );
     }
 
     const newTag = await tagsCollection.insertOne({
@@ -35,10 +37,12 @@ export const createNewTag = async (
       createdBy: userId,
     });
 
-    return reply.send(successResponse('Tag created successfully', 201, newTag));
+    return reply
+      .status(201)
+      .send(successResponse('Tag created successfully', 201, newTag));
   } catch (error) {
     console.error(error);
-    return reply.send(errorResponse());
+    return reply.status(REQUEST_ERROR.internalError.code).send(errorResponse());
   }
 };
 
@@ -51,26 +55,30 @@ export const deleteTagById = async (
   reply: FastifyReply
 ) => {
   try {
-    const userId = request.user.userId;
+    const userId = request.session.user.id;
     const { tagId } = request.params;
     const tagsCollection = getTagCollection(request.server);
 
     if (!userId) {
-      return reply.send(
-        errorResponse(
-          REQUEST_ERROR.unauthorized.message,
-          REQUEST_ERROR.unauthorized.code
-        )
-      );
+      return reply
+        .status(REQUEST_ERROR.unauthorized.code)
+        .send(
+          errorResponse(
+            REQUEST_ERROR.unauthorized.message,
+            REQUEST_ERROR.unauthorized.code
+          )
+        );
     }
 
     if (!tagId) {
-      return reply.send(
-        errorResponse(
-          `${REQUEST_ERROR.badRequest.message}, tag id is required`,
-          REQUEST_ERROR.badRequest.code
-        )
-      );
+      return reply
+        .status(REQUEST_ERROR.badRequest.code)
+        .send(
+          errorResponse(
+            `${REQUEST_ERROR.badRequest.message}, tag id is required`,
+            REQUEST_ERROR.badRequest.code
+          )
+        );
     }
 
     const tag = await tagsCollection.findOne({
@@ -79,12 +87,14 @@ export const deleteTagById = async (
     });
 
     if (!tag) {
-      return reply.send(
-        errorResponse(
-          REQUEST_ERROR.notFound.message,
-          REQUEST_ERROR.notFound.code
-        )
-      );
+      return reply
+        .status(REQUEST_ERROR.notFound.code)
+        .send(
+          errorResponse(
+            REQUEST_ERROR.notFound.message,
+            REQUEST_ERROR.notFound.code
+          )
+        );
     }
 
     await tagsCollection.deleteOne({
@@ -100,12 +110,14 @@ export const deleteTagById = async (
   } catch (error) {
     console.error(error);
 
-    return reply.send(
-      errorResponse(
-        REQUEST_ERROR.internalError.message,
-        REQUEST_ERROR.internalError.code
-      )
-    );
+    return reply
+      .status(REQUEST_ERROR.internalError.code)
+      .send(
+        errorResponse(
+          REQUEST_ERROR.internalError.message,
+          REQUEST_ERROR.internalError.code
+        )
+      );
   }
 };
 
@@ -114,15 +126,17 @@ export const getAllTags = async (
   reply: FastifyReply
 ) => {
   try {
-    const userId = request.user.userId;
+    const userId = request.session.user.id;
 
     if (!userId) {
-      return reply.send(
-        errorResponse(
-          REQUEST_ERROR.unauthorized.message,
-          REQUEST_ERROR.unauthorized.code
-        )
-      );
+      return reply
+        .status(REQUEST_ERROR.unauthorized.code)
+        .send(
+          errorResponse(
+            REQUEST_ERROR.unauthorized.message,
+            REQUEST_ERROR.unauthorized.code
+          )
+        );
     }
 
     const tagsCollection = getTagCollection(request.server);
@@ -132,9 +146,9 @@ export const getAllTags = async (
       })
       .toArray();
 
-    return reply.send(successResponse(undefined, undefined, tags));
+    return reply.status(200).send(successResponse(undefined, undefined, tags));
   } catch (error) {
     console.error();
-    return reply.send(errorResponse());
+    return reply.status(REQUEST_ERROR.internalError.code).send(errorResponse());
   }
 };

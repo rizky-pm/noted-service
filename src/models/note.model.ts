@@ -1,6 +1,5 @@
 import { Collection } from 'mongodb';
 import { FastifyInstance } from 'fastify';
-import { INote } from '../types/note.type';
 
 export const getNoteCollection = (server: FastifyInstance): Collection => {
   if (!server.mongo.db) {
