@@ -11,10 +11,11 @@ export interface INote {
 }
 
 export interface IGetAllNotes {
-  queryString: {
+  QueryString: {
     page?: string;
     limit?: string;
     sort?: 'ASC' | 'DESC';
+    title?: string;
   };
 }
 

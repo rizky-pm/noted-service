@@ -54,11 +54,10 @@ export const createNewNote = async (
       );
     }
 
-    // Store only the tag's ID as a reference
     const newNote = await notesCollection.insertOne({
       title,
       content,
-      tagId: new ObjectId(tagData._id), // Store reference
+      tagId: new ObjectId(tagData._id),
       ownerId: new ObjectId(userId),
       createdAt: dayjs().unix(),
       updatedAt: dayjs().unix(),
@@ -86,6 +85,7 @@ export const getAllNotes = async (
       page?: string;
       limit?: string;
       sort?: 'ASC' | 'DESC';
+      title?: string;
     };
   }>,
   reply: FastifyReply
@@ -100,12 +100,14 @@ export const getAllNotes = async (
     }
 
     if (!userId) {
-      return reply.send(
-        errorResponse(
-          REQUEST_ERROR.unauthorized.message,
-          REQUEST_ERROR.unauthorized.code
-        )
-      );
+      return reply
+        .status(REQUEST_ERROR.unauthorized.code)
+        .send(
+          errorResponse(
+            REQUEST_ERROR.unauthorized.message,
+            REQUEST_ERROR.unauthorized.code
+          )
+        );
     }
 
     const notesCollection = getNoteCollection(request.server);
@@ -114,30 +116,34 @@ export const getAllNotes = async (
     const limit = parseInt(request.query.limit ?? '10', 10);
     const skip = (page - 1) * limit;
 
+    const matchFilter: Record<string, any> = { ownerId: new ObjectId(userId) };
+
+    if (request.query.title) {
+      matchFilter.title = { $regex: new RegExp(request.query.title, 'i') };
+    }
+
     const notes = await notesCollection
       .aggregate([
-        { $match: { ownerId: new ObjectId(userId) } }, // Filter by user ID
-        { $sort: { createdAt: sortAscending } }, // Sort by latest created notes
-        { $skip: skip }, // Pagination: Skip documents
-        { $limit: limit }, // Pagination: Limit results
+        { $match: matchFilter },
+        { $sort: { createdAt: sortAscending } },
+        { $skip: skip },
+        { $limit: limit },
         {
           $lookup: {
-            from: 'tags', // Ensure this is the correct collection name
-            let: { tagId: { $toObjectId: '$tagId' } }, // Convert to ObjectId if necessary
+            from: 'tags',
+            let: { tagId: { $toObjectId: '$tagId' } },
             pipeline: [
               { $match: { $expr: { $eq: ['$_id', '$$tagId'] } } },
-              { $project: { id: '$_id', label: 1, code: 1, _id: 0 } }, // Select only required fields
+              { $project: { id: '$_id', label: 1, code: 1, _id: 0 } },
             ],
             as: 'tag',
           },
         },
-        { $unwind: { path: '$tag', preserveNullAndEmptyArrays: true } }, // Flatten tag array
+        { $unwind: { path: '$tag', preserveNullAndEmptyArrays: true } },
       ])
       .toArray();
 
-    const totalNotes = await notesCollection.countDocuments({
-      ownerId: userId,
-    });
+    const totalNotes = await notesCollection.countDocuments(matchFilter);
 
     return reply.send(
       successResponse(undefined, undefined, {

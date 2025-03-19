@@ -17,7 +17,7 @@ import {
 export default async function noteRoutes(server: FastifyInstance) {
   // Get all notes
   server.get<{
-    Querystring: IGetAllNotes['queryString'];
+    Querystring: IGetAllNotes['QueryString'];
   }>('/api/v1/notes', { preHandler: server.authenticate }, getAllNotes);
 
   // Get note by id
