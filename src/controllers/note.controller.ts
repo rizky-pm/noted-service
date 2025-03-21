@@ -118,8 +118,6 @@ export const getAllNotes = async (
       matchFilter.title = { $regex: new RegExp(request.body.title, 'i') };
     }
 
-    console.log(request.body.tag);
-
     if (request.body.tag && request.body.tag.length > 0) {
       matchFilter.tagId = {
         $in: request.body.tag.map((id) => new ObjectId(id)),
