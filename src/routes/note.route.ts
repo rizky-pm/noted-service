@@ -15,9 +15,9 @@ import {
 } from '../types/note.type';
 
 export default async function noteRoutes(server: FastifyInstance) {
-  // Get all notes
-  server.get<{
-    Querystring: IGetAllNotes['QueryString'];
+  // Get all notes (Changed to POST for filtering)
+  server.post<{
+    Body: IGetAllNotes['Body'];
   }>('/api/v1/notes', { preHandler: server.authenticate }, getAllNotes);
 
   // Get note by id

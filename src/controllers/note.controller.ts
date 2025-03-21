@@ -81,23 +81,19 @@ export const createNewNote = async (
 
 export const getAllNotes = async (
   request: FastifyRequest<{
-    Querystring: {
+    Body: {
       page?: string;
       limit?: string;
       sort?: 'ASC' | 'DESC';
       title?: string;
+      tag?: string[]; // Array of tag IDs to filter by
     };
   }>,
   reply: FastifyReply
 ) => {
   try {
     const userId = request.session.user.id;
-    let sortAscending;
-    if (!request.query.sort) {
-      sortAscending = 1;
-    } else if (request.query.sort === 'DESC') {
-      sortAscending = -1;
-    }
+    let sortAscending = request.body.sort === 'DESC' ? -1 : 1;
 
     if (!userId) {
       return reply
@@ -112,14 +108,22 @@ export const getAllNotes = async (
 
     const notesCollection = getNoteCollection(request.server);
 
-    const page = parseInt(request.query.page ?? '1', 10);
-    const limit = parseInt(request.query.limit ?? '10', 10);
+    const page = parseInt(request.body.page ?? '1', 10);
+    const limit = parseInt(request.body.limit ?? '10', 10);
     const skip = (page - 1) * limit;
 
     const matchFilter: Record<string, any> = { ownerId: new ObjectId(userId) };
 
-    if (request.query.title) {
-      matchFilter.title = { $regex: new RegExp(request.query.title, 'i') };
+    if (request.body.title) {
+      matchFilter.title = { $regex: new RegExp(request.body.title, 'i') };
+    }
+
+    console.log(request.body.tag);
+
+    if (request.body.tag && request.body.tag.length > 0) {
+      matchFilter.tagId = {
+        $in: request.body.tag.map((id) => new ObjectId(id)),
+      };
     }
 
     const notes = await notesCollection
