@@ -262,9 +262,9 @@ export const updateNoteById = async (
     }
 
     const notesCollection = getNoteCollection(request.server);
-    const existingNote = notesCollection.findOne({
+    const existingNote = await notesCollection.findOne({
       _id: new ObjectId(noteId),
-      ownerId: userId,
+      ownerId: new ObjectId(userId),
     });
 
     if (!existingNote) {
@@ -289,7 +289,7 @@ export const updateNoteById = async (
     if (content) updatedFields.content = content;
 
     const updatedNote = await notesCollection.updateOne(
-      { _id: new ObjectId(noteId), ownerId: userId },
+      { _id: new ObjectId(noteId), ownerId: new ObjectId(userId) },
       { $set: updatedFields }
     );
 
