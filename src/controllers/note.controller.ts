@@ -20,7 +20,7 @@ export const createNewNote = async (
 ) => {
   try {
     const userId = request.session.user.id;
-    const { title, content, tag } = request.body;
+    const { title, content, tag, position } = request.body;
     const notesCollection = getNoteCollection(request.server);
     const tagsCollection = getTagCollection(request.server);
 
@@ -42,7 +42,6 @@ export const createNewNote = async (
       );
     }
 
-    // Find the tag by its code
     const tagData = await tagsCollection.findOne({ code: tag });
 
     if (!tagData) {
@@ -61,6 +60,10 @@ export const createNewNote = async (
       ownerId: new ObjectId(userId),
       createdAt: dayjs().unix(),
       updatedAt: dayjs().unix(),
+      position: {
+        x: position.x,
+        y: position.y,
+      },
     });
 
     return reply.send(
@@ -367,6 +370,94 @@ export const deleteNoteById = async (
   } catch (error) {
     console.error(error);
 
+    return reply
+      .status(REQUEST_ERROR.internalError.code)
+      .send(
+        errorResponse(
+          REQUEST_ERROR.internalError.message,
+          REQUEST_ERROR.internalError.code
+        )
+      );
+  }
+};
+
+export const updateNotePosition = async (
+  request: FastifyRequest<{
+    Params: { noteId: string };
+    Body: { x: number; y: number };
+  }>,
+  reply: FastifyReply
+) => {
+  try {
+    const userId = request.session.user.id;
+    const { noteId } = request.params;
+    const { x, y } = request.body;
+
+    if (!userId) {
+      return reply
+        .status(REQUEST_ERROR.unauthorized.code)
+        .send(
+          errorResponse(
+            REQUEST_ERROR.unauthorized.message,
+            REQUEST_ERROR.unauthorized.code
+          )
+        );
+    }
+
+    if (!noteId || x === undefined || y === undefined) {
+      return reply
+        .status(REQUEST_ERROR.badRequest.code)
+        .send(
+          errorResponse(
+            `${REQUEST_ERROR.badRequest.message}, noteId, x, and y are required`,
+            REQUEST_ERROR.badRequest.code
+          )
+        );
+    }
+
+    const notesCollection = getNoteCollection(request.server);
+
+    const existingNote = await notesCollection.findOne({
+      _id: new ObjectId(noteId),
+      ownerId: new ObjectId(userId),
+    });
+
+    if (!existingNote) {
+      return reply
+        .status(REQUEST_ERROR.notFound.code)
+        .send(
+          errorResponse(
+            REQUEST_ERROR.notFound.message,
+            REQUEST_ERROR.notFound.code
+          )
+        );
+    }
+
+    const updateResult = await notesCollection.updateOne(
+      { _id: new ObjectId(noteId), ownerId: new ObjectId(userId) },
+      { $set: { position: { x, y }, updatedAt: dayjs().unix() } }
+    );
+
+    if (updateResult.modifiedCount === 0) {
+      return reply
+        .status(500)
+        .send(
+          errorResponse(
+            'Failed to update note position',
+            REQUEST_ERROR.internalError.code
+          )
+        );
+    }
+
+    return reply.status(200).send(
+      successResponse('Note position updated successfully', 200, {
+        noteId,
+        x,
+        y,
+      })
+    );
+  } catch (error) {
+    console.error(error);
     return reply
       .status(REQUEST_ERROR.internalError.code)
       .send(

@@ -28,6 +28,10 @@ export interface ICreateNewNote {
     label: string;
   };
   content: string;
+  position: {
+    x: number;
+    y: number;
+  };
 }
 
 export interface IGetNewNoteById {

@@ -5,6 +5,7 @@ import {
   getAllNotes,
   getNoteById,
   updateNoteById,
+  updateNotePosition,
 } from '../controllers/note.controller';
 import {
   ICreateNewNote,
@@ -51,5 +52,12 @@ export default async function noteRoutes(server: FastifyInstance) {
     '/api/v1/notes/:noteId',
     { preHandler: server.authenticate },
     deleteNoteById
+  );
+
+  // Update note position
+  server.patch<{ Params: { noteId: string }; Body: { x: number; y: number } }>(
+    '/api/v1/notes/update-position/:noteId',
+    { preHandler: server.authenticate },
+    updateNotePosition
   );
 }
