@@ -8,50 +8,48 @@ import dayjs from 'dayjs';
 import { ObjectId } from 'mongodb';
 
 export const createNewTag = async (
-  request: FastifyRequest<{
-    Body: ICreateNewTag;
-  }>,
+  request: FastifyRequest<{ Body: ICreateNewTag }>,
   reply: FastifyReply
 ) => {
   try {
     const userId = request.session.user.id;
-    const { value } = request.body;
+    const { title, color } = request.body;
     const tagsCollection = getTagCollection(request.server);
 
-    if (!value) {
-      return reply
-        .status(REQUEST_ERROR.badRequest.code)
-        .send(
-          errorResponse(
-            `${REQUEST_ERROR.badRequest.message}, tag name is required`,
-            REQUEST_ERROR.badRequest.code
-          )
-        );
+    if (!title) {
+      return reply.status(400).send({ error: 'Tag name is required' });
+    }
+
+    const existingTag = await tagsCollection.findOne({
+      label: _.capitalize(title),
+      createdBy: new ObjectId(userId),
+    });
+
+    if (existingTag) {
+      return reply.status(409).send({ error: 'Tag already exists' });
     }
 
     const newTag = await tagsCollection.insertOne({
-      label: _.capitalize(value),
-      code: _.kebabCase(value),
+      label: _.capitalize(title),
+      code: _.kebabCase(title),
+      color,
       createdAt: dayjs().unix(),
       updatedAt: dayjs().unix(),
-      createdBy: userId,
+      createdBy: new ObjectId(userId),
     });
 
-    return reply
-      .status(201)
-      .send(successResponse('Tag created successfully', 201, newTag));
+    return reply.status(201).send({
+      message: 'Tag created successfully',
+      tagId: newTag.insertedId,
+    });
   } catch (error) {
     console.error(error);
-    return reply.status(REQUEST_ERROR.internalError.code).send(errorResponse());
+    return reply.status(500).send({ error: 'Internal Server Error' });
   }
 };
 
 export const deleteTagById = async (
-  request: FastifyRequest<{
-    Params: {
-      tagId: string;
-    };
-  }>,
+  request: FastifyRequest<{ Params: { tagId: string } }>,
   reply: FastifyReply
 ) => {
   try {
@@ -59,65 +57,28 @@ export const deleteTagById = async (
     const { tagId } = request.params;
     const tagsCollection = getTagCollection(request.server);
 
-    if (!userId) {
-      return reply
-        .status(REQUEST_ERROR.unauthorized.code)
-        .send(
-          errorResponse(
-            REQUEST_ERROR.unauthorized.message,
-            REQUEST_ERROR.unauthorized.code
-          )
-        );
-    }
-
-    if (!tagId) {
-      return reply
-        .status(REQUEST_ERROR.badRequest.code)
-        .send(
-          errorResponse(
-            `${REQUEST_ERROR.badRequest.message}, tag id is required`,
-            REQUEST_ERROR.badRequest.code
-          )
-        );
-    }
-
-    const tag = await tagsCollection.findOne({
-      _id: new ObjectId(tagId),
-      createdBy: userId,
-    });
+    const tag = await tagsCollection.findOne({ _id: new ObjectId(tagId) });
 
     if (!tag) {
       return reply
-        .status(REQUEST_ERROR.notFound.code)
-        .send(
-          errorResponse(
-            REQUEST_ERROR.notFound.message,
-            REQUEST_ERROR.notFound.code
-          )
-        );
+        .status(404)
+        .send(errorResponse('Tag not foundssssssssss', 404));
     }
 
-    await tagsCollection.deleteOne({
-      _id: new ObjectId(tagId),
-      createdBy: userId,
-    });
-
-    return reply.send(
-      successResponse(`Tag '${tag.label}' successfully deleted`, undefined, {
-        tagId,
-      })
-    );
-  } catch (error) {
-    console.error(error);
+    if (tag.createdBy.toString() === userId) {
+      await tagsCollection.deleteOne({ _id: new ObjectId(tagId) });
+    } else {
+      return reply
+        .status(403)
+        .send(errorResponse('You are not authorized to delete this tag', 403));
+    }
 
     return reply
-      .status(REQUEST_ERROR.internalError.code)
-      .send(
-        errorResponse(
-          REQUEST_ERROR.internalError.message,
-          REQUEST_ERROR.internalError.code
-        )
-      );
+      .status(200)
+      .send(successResponse('Tag deleted successfully', 200));
+  } catch (error) {
+    console.error(error);
+    return reply.status(500).send(errorResponse());
   }
 };
 
@@ -126,29 +87,65 @@ export const getAllTags = async (
   reply: FastifyReply
 ) => {
   try {
-    const userId = request.session.user.id;
-
-    if (!userId) {
-      return reply
-        .status(REQUEST_ERROR.unauthorized.code)
-        .send(
-          errorResponse(
-            REQUEST_ERROR.unauthorized.message,
-            REQUEST_ERROR.unauthorized.code
-          )
-        );
-    }
-
+    const userId = new ObjectId(request.session.user.id);
     const tagsCollection = getTagCollection(request.server);
+
     const tags = await tagsCollection
       .find({
-        createdBy: { $in: ['SYSTEM', userId] },
+        $or: [{ createdBy: userId }, { createdBy: null }],
       })
       .toArray();
 
-    return reply.status(200).send(successResponse(undefined, undefined, tags));
+    const formattedTags = tags.map((tag) => ({
+      ...tag,
+      deletable: tag.createdBy !== null ? true : false,
+    }));
+
+    return reply
+      .status(200)
+      .send(successResponse('Tags retrieved', 200, formattedTags));
   } catch (error) {
-    console.error();
+    console.error(error);
     return reply.status(REQUEST_ERROR.internalError.code).send(errorResponse());
+  }
+};
+
+export const createSystemTag = async (
+  request: FastifyRequest<{ Body: { title: string; color: string } }>,
+  reply: FastifyReply
+) => {
+  try {
+    const { title, color } = request.body;
+    const tagsCollection = getTagCollection(request.server);
+
+    if (!title) {
+      return reply.status(400).send({ error: 'Tag name is required' });
+    }
+
+    const existingTag = await tagsCollection.findOne({
+      label: _.capitalize(title),
+      createdBy: null,
+    });
+
+    if (existingTag) {
+      return reply.status(409).send({ error: 'System tag already exists' });
+    }
+
+    const newTag = await tagsCollection.insertOne({
+      label: _.capitalize(title),
+      code: _.kebabCase(title),
+      color,
+      createdAt: dayjs().unix(),
+      updatedAt: dayjs().unix(),
+      createdBy: null,
+    });
+
+    return reply.status(201).send({
+      message: 'System tag created successfully',
+      tagId: newTag.insertedId,
+    });
+  } catch (error) {
+    console.error(error);
+    return reply.status(500).send({ error: 'Internal Server Error' });
   }
 };

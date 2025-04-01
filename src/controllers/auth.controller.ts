@@ -27,8 +27,10 @@ export const registerUser = async (
   const result = await userCollection.insertOne({
     username,
     email,
+    avatar: null,
     password: hashedPassword,
     createdAt: dayjs().unix(),
+    lastModifiedAt: dayjs().unix(),
   });
 
   if (!result.insertedId) {
@@ -63,6 +65,7 @@ export const loginUser = async (
     id: user._id.toString(),
     username: user.username,
     email: user.email,
+    avatar: user.avatar || null,
   };
 
   return reply
@@ -99,5 +102,6 @@ export const getAuthenticatedUser = async (
     id: request.session.user.id,
     username: request.session.user.username,
     email: request.session.user.email,
+    avatar: request.session.user.avatar,
   });
 };

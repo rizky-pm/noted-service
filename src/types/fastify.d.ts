@@ -14,6 +14,7 @@ declare module 'fastify' {
       id: string;
       username: string;
       email: string;
+      avatar: string | null;
     };
   }
 
@@ -22,6 +23,7 @@ declare module 'fastify' {
       userId: string;
       username: string;
       email: string;
+      avatar: string | null;
     };
   }
 }

@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { ICreateNewTag } from '../types/tag.type';
 import {
   createNewTag,
+  // createSystemTag,
   deleteTagById,
   getAllTags,
 } from '../controllers/tag.controller';
@@ -31,4 +32,6 @@ export default async function tagRoutes(server: FastifyInstance) {
     { preHandler: server.authenticate },
     deleteTagById
   );
+
+  // server.post('/api/v1/tag/create-new-tag-by-system', createSystemTag);
 }

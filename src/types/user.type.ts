@@ -10,6 +10,7 @@ export interface IUser {
   email: string;
   password: string;
   createdAt: number;
+  avatar: string | null;
   lastModifiedAt?: number;
 }
 
