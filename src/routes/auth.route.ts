@@ -4,6 +4,7 @@ import {
   loginUser,
   logoutUser,
   getAuthenticatedUser,
+  editUser,
 } from '../controllers/auth.controller';
 
 export default async function authRoutes(server: FastifyInstance) {
@@ -18,5 +19,16 @@ export default async function authRoutes(server: FastifyInstance) {
     '/api/v1/auth/me',
     { preHandler: server.authenticate },
     getAuthenticatedUser
+  );
+
+  server.patch<{
+    Body: {
+      avatar: string | null;
+      username: string;
+    };
+  }>(
+    '/api/v1/auth/edit-profile',
+    { preHandler: server.authenticate },
+    editUser
   );
 }

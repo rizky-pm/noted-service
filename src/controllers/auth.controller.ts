@@ -5,6 +5,8 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { getUserCollection } from '../models/user.model';
 import { UserCredentials } from '../types/user.type';
 import { errorResponse, successResponse } from '../helpers/response.helper';
+import { REQUEST_ERROR } from '../constant';
+import { ObjectId } from 'mongodb';
 
 export const registerUser = async (
   requet: FastifyRequest<{ Body: UserCredentials }>,
@@ -104,4 +106,96 @@ export const getAuthenticatedUser = async (
     email: request.session.user.email,
     avatar: request.session.user.avatar,
   });
+};
+
+export const editUser = async (
+  request: FastifyRequest<{
+    Body: {
+      avatar?: string | null;
+      username?: string;
+    };
+  }>,
+  reply: FastifyReply
+) => {
+  try {
+    const userId = new ObjectId(request.session.user.id);
+    const { avatar, username } = request.body;
+    const userCollection = getUserCollection(request.server);
+
+    if (!userId) {
+      return reply
+        .status(REQUEST_ERROR.unauthorized.code)
+        .send(
+          errorResponse(
+            REQUEST_ERROR.unauthorized.message,
+            REQUEST_ERROR.unauthorized.code
+          )
+        );
+    }
+
+    const userToBeUpdated = await userCollection.findOne({
+      _id: userId,
+    });
+
+    if (!userToBeUpdated) {
+      return reply
+        .status(REQUEST_ERROR.notFound.code)
+        .send(errorResponse('User not found', REQUEST_ERROR.notFound.code));
+    }
+
+    if (username && username !== userToBeUpdated.username) {
+      const userTobeUpdated = await userCollection.findOne({ username });
+
+      if (userTobeUpdated) {
+        return reply
+          .status(REQUEST_ERROR.badRequest.code)
+          .send(
+            errorResponse(
+              'Username already exists',
+              REQUEST_ERROR.badRequest.code
+            )
+          );
+      }
+    }
+
+    const updatedFields: Partial<{
+      avatar: string | null;
+      username: string;
+      lastModifiedAt: number;
+    }> = {
+      lastModifiedAt: dayjs().unix(),
+    };
+
+    if (avatar !== undefined) updatedFields.avatar = avatar;
+    if (username !== undefined && username !== userToBeUpdated.username) {
+      updatedFields.username = username;
+    }
+
+    const updatedProfile = await userCollection.updateOne(
+      { _id: userId },
+      { $set: updatedFields }
+    );
+
+    request.session.user = {
+      ...request.session.user,
+      ...(avatar !== undefined && { avatar }),
+      ...(username !== undefined &&
+        username !== userToBeUpdated.username && { username }),
+    };
+
+    return reply
+      .status(200)
+      .send(
+        successResponse(
+          'Success edit profile',
+          200,
+          updatedProfile.modifiedCount
+        )
+      );
+  } catch (error) {
+    console.error(error);
+    return reply
+      .status(REQUEST_ERROR.internalError.code)
+      .send(errorResponse(undefined, REQUEST_ERROR.internalError.code));
+  }
 };
