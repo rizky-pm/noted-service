@@ -11,6 +11,9 @@ import {
 } from '../types/note.type';
 import { ObjectId } from 'mongodb';
 import getTagCollection from '../models/tag.model';
+import { WebSocket } from '@fastify/websocket';
+
+const wsClients = new Set<WebSocket>();
 
 export const createNewNote = async (
   request: FastifyRequest<{
@@ -63,6 +66,7 @@ export const createNewNote = async (
       position: {
         x: position.x,
         y: position.y,
+        lastMovedAt: dayjs().unix(),
       },
     });
 
@@ -382,89 +386,59 @@ export const deleteNoteById = async (
 };
 
 export const updateNotePosition = async (
-  request: FastifyRequest<{
-    Params: { noteId: string };
-    Body: { x: number; y: number };
-  }>,
-  reply: FastifyReply
+  socket: WebSocket,
+  request: FastifyRequest
 ) => {
-  try {
-    const userId = request.session.user.id;
-    const { noteId } = request.params;
-    const { x, y } = request.body;
+  wsClients.add(socket);
+  socket.on('message', async (message) => {
+    try {
+      const data = JSON.parse(message.toString());
+      if (data.type === 'UPDATE_NOTE_POSITION') {
+        const { noteId, x, y } = data.payload;
 
-    if (!userId) {
-      return reply
-        .status(REQUEST_ERROR.unauthorized.code)
-        .send(
-          errorResponse(
-            REQUEST_ERROR.unauthorized.message,
-            REQUEST_ERROR.unauthorized.code
-          )
+        const notesCollection = getNoteCollection(request.server);
+        const lastMovedAt = dayjs().unix();
+
+        await notesCollection.updateOne(
+          { _id: new ObjectId(noteId) },
+          {
+            $set: { position: { x, y, lastMovedAt } },
+          }
         );
+
+        const broadcastData = JSON.stringify({
+          type: 'UPDATE_NOTE_POSITION',
+          payload: {
+            noteId,
+            x,
+            y,
+            lastMovedAt,
+          },
+        });
+
+        for (const client of wsClients) {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(broadcastData);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Invalid websocket message or DB error:', error);
     }
+  });
 
-    if (!noteId || x === undefined || y === undefined) {
-      return reply
-        .status(REQUEST_ERROR.badRequest.code)
-        .send(
-          errorResponse(
-            `${REQUEST_ERROR.badRequest.message}, noteId, x, and y are required`,
-            REQUEST_ERROR.badRequest.code
-          )
-        );
-    }
+  socket.on('close', () => {
+    wsClients.delete(socket);
+  });
+};
 
-    const notesCollection = getNoteCollection(request.server);
+export const wsTestHandler = (socket: WebSocket, _req: FastifyRequest) => {
+  socket.on('message', (message) => {
+    console.log('📨 Message received from client:', message.toString());
+    socket.send('hi from server');
+  });
 
-    const existingNote = await notesCollection.findOne({
-      _id: new ObjectId(noteId),
-      ownerId: new ObjectId(userId),
-    });
-
-    if (!existingNote) {
-      return reply
-        .status(REQUEST_ERROR.notFound.code)
-        .send(
-          errorResponse(
-            REQUEST_ERROR.notFound.message,
-            REQUEST_ERROR.notFound.code
-          )
-        );
-    }
-
-    const updateResult = await notesCollection.updateOne(
-      { _id: new ObjectId(noteId), ownerId: new ObjectId(userId) },
-      { $set: { position: { x, y }, updatedAt: dayjs().unix() } }
-    );
-
-    if (updateResult.modifiedCount === 0) {
-      return reply
-        .status(500)
-        .send(
-          errorResponse(
-            'Failed to update note position',
-            REQUEST_ERROR.internalError.code
-          )
-        );
-    }
-
-    return reply.status(200).send(
-      successResponse('Note position updated successfully', 200, {
-        noteId,
-        x,
-        y,
-      })
-    );
-  } catch (error) {
-    console.error(error);
-    return reply
-      .status(REQUEST_ERROR.internalError.code)
-      .send(
-        errorResponse(
-          REQUEST_ERROR.internalError.message,
-          REQUEST_ERROR.internalError.code
-        )
-      );
-  }
+  socket.on('close', () => {
+    console.log('🔌 Client disconnected');
+  });
 };

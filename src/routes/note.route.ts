@@ -6,6 +6,7 @@ import {
   getNoteById,
   updateNoteById,
   updateNotePosition,
+  wsTestHandler,
 } from '../controllers/note.controller';
 import {
   ICreateNewNote,
@@ -54,10 +55,13 @@ export default async function noteRoutes(server: FastifyInstance) {
     deleteNoteById
   );
 
-  // Update note position
-  server.patch<{ Params: { noteId: string }; Body: { x: number; y: number } }>(
-    '/api/v1/notes/update-position/:noteId',
-    { preHandler: server.authenticate },
+  // Check websocket connection
+  server.get('/ws/check-connection', { websocket: true }, wsTestHandler);
+
+  // Update note position using websocket
+  server.get(
+    '/ws/v1/notes/update-position',
+    { websocket: true, preHandler: server.authenticate },
     updateNotePosition
   );
 }

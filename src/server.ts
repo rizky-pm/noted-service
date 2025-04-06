@@ -1,6 +1,7 @@
 import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import fastifyCookie from '@fastify/cookie';
+import fastifyWebsocket from '@fastify/websocket';
 
 import 'dotenv/config';
 import { connectDatabase } from './config/database';
@@ -55,6 +56,8 @@ fastify.decorate(
     }
   }
 );
+
+fastify.register(fastifyWebsocket);
 
 // Register routes
 fastify.register(authRoutes);
