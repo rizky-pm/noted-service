@@ -199,3 +199,78 @@ export const editUser = async (
       .send(errorResponse(undefined, REQUEST_ERROR.internalError.code));
   }
 };
+
+export const changePassword = async (
+  request: FastifyRequest<{
+    Body: {
+      oldPassword: string;
+      newPassword: string;
+    };
+  }>,
+  reply: FastifyReply
+) => {
+  try {
+    const userId = new ObjectId(request.session.user.id);
+    const userCollection = getUserCollection(request.server);
+    const { oldPassword, newPassword } = request.body;
+
+    if (!userId) {
+      return reply
+        .status(REQUEST_ERROR.unauthorized.code)
+        .send(
+          errorResponse(
+            REQUEST_ERROR.unauthorized.message,
+            REQUEST_ERROR.unauthorized.code
+          )
+        );
+    }
+
+    if (!oldPassword) {
+      return reply
+        .status(400)
+        .send(errorResponse('Current password is required', 400));
+    }
+
+    if (!newPassword) {
+      return reply
+        .status(400)
+        .send(errorResponse('New password is required', 400));
+    }
+
+    const userToBeUpdated = await userCollection.findOne({ _id: userId });
+
+    if (!userToBeUpdated) {
+      return reply
+        .status(REQUEST_ERROR.notFound.code)
+        .send(errorResponse('User not found', REQUEST_ERROR.notFound.code));
+    }
+
+    const isOldPasswordCorrect = await bcrypt.compare(
+      oldPassword,
+      userToBeUpdated.password
+    );
+
+    if (!isOldPasswordCorrect) {
+      return reply.status(400).send(
+        errorResponse('Old password is not correct', 400, {
+          errorCode: 'invalid-old-password',
+        })
+      );
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    await userCollection.updateOne(
+      { _id: userId },
+      { $set: { password: hashedNewPassword, lastModifiedAt: dayjs().unix() } }
+    );
+
+    return reply
+      .status(200)
+      .send(successResponse('Password updated successfully', 200));
+  } catch (error) {
+    console.error('Failed to change password:', error);
+
+    return reply.status(500).send(errorResponse('Internal Server Error', 500));
+  }
+};
