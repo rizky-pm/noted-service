@@ -93,7 +93,7 @@ export const getAllNotes = async (
       limit?: string;
       sort?: 'ASC' | 'DESC';
       title?: string;
-      tag?: string[]; // Array of tag IDs to filter by
+      tag?: string[];
     };
   }>,
   reply: FastifyReply
@@ -143,7 +143,7 @@ export const getAllNotes = async (
             let: { tagId: { $toObjectId: '$tagId' } },
             pipeline: [
               { $match: { $expr: { $eq: ['$_id', '$$tagId'] } } },
-              { $project: { id: '$_id', label: 1, code: 1, _id: 0 } },
+              { $project: { id: '$_id', label: 1, code: 1, _id: 0, color: 1 } },
             ],
             as: 'tag',
           },
