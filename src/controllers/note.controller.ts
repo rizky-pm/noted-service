@@ -56,6 +56,10 @@ export const createNewNote = async (
       );
     }
 
+    const noteCount = await notesCollection.countDocuments({
+      ownerId: new ObjectId(userId),
+    });
+
     const newNote = await notesCollection.insertOne({
       title,
       content,
@@ -66,6 +70,7 @@ export const createNewNote = async (
       position: {
         x: position.x,
         y: position.y,
+        order: noteCount,
         lastMovedAt: dayjs().unix(),
       },
     });
@@ -390,35 +395,87 @@ export const updateNotePosition = async (
   request: FastifyRequest
 ) => {
   wsClients.add(socket);
+
   socket.on('message', async (message) => {
     try {
       const data = JSON.parse(message.toString());
       if (data.type === 'UPDATE_NOTE_POSITION') {
-        const { noteId, x, y } = data.payload;
+        const { noteId, x, y, order } = data.payload;
 
         const notesCollection = getNoteCollection(request.server);
         const lastMovedAt = dayjs().unix();
 
-        await notesCollection.updateOne(
-          { _id: new ObjectId(noteId) },
-          {
-            $set: { position: { x, y, lastMovedAt } },
+        if (typeof order === 'number') {
+          const movedNote = await notesCollection.findOne({
+            _id: new ObjectId(noteId),
+          });
+
+          if (!movedNote) return;
+
+          const oldOrder = movedNote.position.order;
+
+          // Update the moved note
+          await notesCollection.updateOne(
+            { _id: new ObjectId(noteId) },
+            { $set: { 'position.order': order } }
+          );
+
+          if (order > oldOrder) {
+            // Moved down → decrement others between old+1 and new
+            await notesCollection.updateMany(
+              {
+                'position.order': { $gt: oldOrder, $lte: order },
+                _id: { $ne: new ObjectId(noteId) },
+              },
+              { $inc: { 'position.order': -1 } }
+            );
+          } else if (order < oldOrder) {
+            // Moved up → increment others between new and old-1
+            await notesCollection.updateMany(
+              {
+                'position.order': { $gte: order, $lt: oldOrder },
+                _id: { $ne: new ObjectId(noteId) },
+              },
+              { $inc: { 'position.order': 1 } }
+            );
           }
-        );
 
-        const broadcastData = JSON.stringify({
-          type: 'UPDATE_NOTE_POSITION',
-          payload: {
-            noteId,
-            x,
-            y,
-            lastMovedAt,
-          },
-        });
+          const broadcastData = JSON.stringify({
+            type: 'UPDATE_NOTE_POSITION',
+            payload: { noteId, order, oldOrder },
+          });
 
-        for (const client of wsClients) {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(broadcastData);
+          for (const client of wsClients) {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(broadcastData);
+            }
+          }
+        } else {
+          await notesCollection.updateOne(
+            { _id: new ObjectId(noteId) },
+            {
+              $set: {
+                'position.x': x,
+                'position.y': y,
+                'position.lastMovedAt': lastMovedAt,
+              },
+            }
+          );
+
+          const broadcastData = JSON.stringify({
+            type: 'UPDATE_NOTE_POSITION',
+            payload: {
+              noteId,
+              x,
+              y,
+              lastMovedAt,
+            },
+          });
+
+          for (const client of wsClients) {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(broadcastData);
+            }
           }
         }
       }
