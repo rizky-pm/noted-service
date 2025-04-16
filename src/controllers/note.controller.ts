@@ -274,10 +274,18 @@ export const updateNoteById = async (
     }
 
     const notesCollection = getNoteCollection(request.server);
+    const tagCollection = getTagCollection(request.server);
+
     const existingNote = await notesCollection.findOne({
       _id: new ObjectId(noteId),
       ownerId: new ObjectId(userId),
     });
+
+    let newTag;
+
+    if (tag) {
+      newTag = await tagCollection.findOne({ code: tag });
+    }
 
     if (!existingNote) {
       return reply
@@ -293,12 +301,14 @@ export const updateNoteById = async (
     const updatedFields: Partial<{
       title: string;
       content: string;
+      tagId: ObjectId;
       updatedAt: number;
     }> = {
       updatedAt: dayjs().unix(),
     };
     if (title) updatedFields.title = title;
     if (content) updatedFields.content = content;
+    if (newTag) updatedFields.tagId = new ObjectId(newTag._id);
 
     const updatedNote = await notesCollection.updateOne(
       { _id: new ObjectId(noteId), ownerId: new ObjectId(userId) },
