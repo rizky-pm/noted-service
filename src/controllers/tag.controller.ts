@@ -6,6 +6,7 @@ import { REQUEST_ERROR } from '../constant';
 import _ from 'lodash';
 import dayjs from 'dayjs';
 import { ObjectId } from 'mongodb';
+import { getNoteCollection } from '../models/note.model';
 
 export const createNewTag = async (
   request: FastifyRequest<{ Body: ICreateNewTag }>,
@@ -60,9 +61,7 @@ export const deleteTagById = async (
     const tag = await tagsCollection.findOne({ _id: new ObjectId(tagId) });
 
     if (!tag) {
-      return reply
-        .status(404)
-        .send(errorResponse('Tag not foundssssssssss', 404));
+      return reply.status(404).send(errorResponse('Tag not founds', 404));
     }
 
     if (tag.createdBy.toString() === userId) {
