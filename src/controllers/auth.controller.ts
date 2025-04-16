@@ -1,12 +1,13 @@
 import bcrypt from 'bcrypt';
 import dayjs from 'dayjs';
-import { FastifyRequest, FastifyReply } from 'fastify';
+import fastify, { FastifyRequest, FastifyReply } from 'fastify';
 
 import { getUserCollection } from '../models/user.model';
 import { UserCredentials } from '../types/user.type';
 import { errorResponse, successResponse } from '../helpers/response.helper';
 import { REQUEST_ERROR } from '../constant';
 import { ObjectId } from 'mongodb';
+import crypto from 'crypto';
 
 export const registerUser = async (
   requet: FastifyRequest<{ Body: UserCredentials }>,
@@ -268,6 +269,184 @@ export const changePassword = async (
     return reply
       .status(200)
       .send(successResponse('Password updated successfully', 200));
+  } catch (error) {
+    console.error('Failed to change password:', error);
+
+    return reply.status(500).send(errorResponse('Internal Server Error', 500));
+  }
+};
+
+export const sendResetPasswordEmail = async (
+  request: FastifyRequest<{
+    Body: {
+      email: string;
+    };
+  }>,
+  reply: FastifyReply
+) => {
+  try {
+    const userCollection = getUserCollection(request.server);
+    const email = request.body.email;
+
+    const user = await userCollection.findOne({ email });
+
+    if (!user) {
+      return reply
+        .status(400)
+        .send(errorResponse('Email is not registered', 400));
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = dayjs().add(1, 'hour').unix();
+    await userCollection.updateOne(
+      { email },
+      {
+        $set: {
+          resetPasswordToken: token,
+          resetPasswordExpires: expires,
+        },
+      }
+    );
+    const baseUrl =
+      process.env.NODE_ENV === 'development'
+        ? 'http://localhost:3000'
+        : 'https://your-production-domain.com';
+
+    const resetLink = `${baseUrl}/auth/forget-password/reset?token=${token}&email=${encodeURIComponent(
+      email
+    )}`;
+
+    await request.mailer.sendMail({
+      to: email,
+      subject: 'Reset Your Password',
+      html: `
+        <p>Hello,</p>
+        <p>You requested to reset your password. Click the link below to proceed:</p>
+        <a href="${resetLink}">${resetLink}</a>
+        <p>This link will expire in 1 hour.</p>
+        <p>If you didn’t request a password reset, you can safely ignore this email.</p>
+      `,
+    });
+
+    return reply
+      .status(200)
+      .send(successResponse('Reset email sent successfully', 200));
+  } catch (error) {
+    console.error('Reset password email error:', error);
+    return reply
+      .status(500)
+      .send(errorResponse('Failed to send reset email', 500, error));
+  }
+};
+
+export const validateResetPasswordSession = async (
+  request: FastifyRequest<{
+    Querystring: {
+      email: string;
+      token: string;
+    };
+  }>,
+  reply: FastifyReply
+) => {
+  try {
+    const userCollection = getUserCollection(request.server);
+    const { email, token } = request.query;
+
+    if (!email || !token) {
+      return reply
+        .status(400)
+        .send(errorResponse('Email and reset password token is required', 400));
+    }
+
+    const user = await userCollection.findOne({ email });
+
+    if (!user) {
+      return reply.status(404).send(errorResponse('User is not found', 404));
+    }
+
+    if (
+      user.resetPasswordToken !== token ||
+      user.resetPasswordExpires < dayjs().unix()
+    ) {
+      await userCollection.updateOne(
+        { email },
+        {
+          $unset: { resetPasswordToken: '', resetPasswordExpires: '' },
+        }
+      );
+
+      return reply.status(400).send(errorResponse('Invalid session', 404));
+    }
+
+    return reply.status(200).send(successResponse(undefined, 200));
+  } catch (error) {
+    return reply.status(500).send(errorResponse('Internal Server Error', 500));
+  }
+};
+
+export const resetPassword = async (
+  request: FastifyRequest<{
+    Body: {
+      newPassword: string;
+      token: string;
+      email: string;
+    };
+  }>,
+  reply: FastifyReply
+) => {
+  try {
+    const userCollection = getUserCollection(request.server);
+    const { email, newPassword, token } = request.body;
+
+    if (!email || !token) {
+      return reply
+        .status(400)
+        .send(errorResponse('Email and reset password token is required', 400));
+    }
+
+    if (!newPassword) {
+      return reply
+        .status(400)
+        .send(errorResponse('New password is required', 400));
+    }
+
+    const user = await userCollection.findOne({ email });
+
+    if (!user) {
+      return reply.status(404).send(errorResponse('User is not found', 404));
+    }
+
+    if (
+      user.resetPasswordToken !== token ||
+      user.resetPasswordExpires < dayjs().unix()
+    ) {
+      await userCollection.updateOne(
+        { email },
+        {
+          $unset: { resetPasswordToken: '', resetPasswordExpires: '' },
+        }
+      );
+      return reply.status(400).send(errorResponse('Invalid session', 404));
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    await userCollection.updateOne(
+      { email },
+      {
+        $set: { password: hashedNewPassword, lastModifietAt: dayjs().unix() },
+        $unset: { resetPasswordToken: '', resetPasswordExpires: '' },
+      }
+    );
+
+    return reply
+      .status(200)
+      .send(
+        successResponse(
+          "Password updated successfully, you'll be redirect to sign in page in a second",
+          200
+        )
+      );
   } catch (error) {
     console.error('Failed to change password:', error);
 

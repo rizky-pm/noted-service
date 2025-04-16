@@ -1,5 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import '@fastify/session';
+import fastifyMailer from 'fastify-mailer';
+import type { FastifyMailerInstance } from 'fastify-mailer';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -7,6 +9,7 @@ declare module 'fastify' {
       request: FastifyRequest,
       reply: FastifyReply
     ) => Promise<void>;
+    mailer: FastifyMailerInstance;
   }
 
   interface Session {
@@ -25,5 +28,6 @@ declare module 'fastify' {
       email: string;
       avatar: string | null;
     };
+    mailer: FastifyMailerInstance;
   }
 }

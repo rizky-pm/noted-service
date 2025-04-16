@@ -1,31 +1,30 @@
-import Fastify, { FastifyReply, FastifyRequest } from 'fastify';
+import Fastify from 'fastify';
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
-import fastifyCookie from '@fastify/cookie';
 import fastifyWebsocket from '@fastify/websocket';
+import cronPlugin from './plugins/cron.plugin';
 
 import 'dotenv/config';
 import { connectDatabase } from './config/database';
 import authRoutes from './routes/auth.route';
-import { errorResponse, successResponse } from './helpers/response.helper';
+import { successResponse } from './helpers/response.helper';
 import noteRoutes from './routes/note.route';
 import tagRoutes from './routes/tag.route';
+import { setupMiddleware } from './middleware';
+import fastifyMailer from 'fastify-mailer';
+import mailerConfig from './config/mailer';
+import fastifyCookie from '@fastify/cookie';
 import fastifySession from '@fastify/session';
-import { REQUEST_ERROR } from './constant';
 import fastifyCors from '@fastify/cors';
+import corsConfig from './config/cors.config';
 
-const fastify = Fastify().withTypeProvider<TypeBoxTypeProvider>();
+const fastify = Fastify({
+  logger: true,
+}).withTypeProvider<TypeBoxTypeProvider>();
 
-// Connect to MongoDB Atlas
 connectDatabase(fastify);
 
-// Register fastify CORS
-fastify.register(fastifyCors, {
-  origin: 'http://localhost:3000',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-});
-
-// Register fastify session based authentication
+setupMiddleware(fastify);
+fastify.register(fastifyMailer, mailerConfig);
 fastify.register(fastifyCookie);
 fastify.register(fastifySession, {
   secret: process.env.SESSION_SECRET || 'supersecretkey',
@@ -39,25 +38,10 @@ fastify.register(fastifySession, {
   saveUninitialized: false,
   rolling: true,
 });
-
-fastify.decorate(
-  'authenticate',
-  async function (request: FastifyRequest, reply: FastifyReply) {
-    const { user } = request.session;
-    if (!user) {
-      return reply
-        .status(401)
-        .send(
-          errorResponse(
-            REQUEST_ERROR.unauthorized.message,
-            REQUEST_ERROR.unauthorized.code
-          )
-        );
-    }
-  }
-);
-
+fastify.register(fastifyCors, corsConfig);
 fastify.register(fastifyWebsocket);
+
+fastify.register(cronPlugin);
 
 // Register routes
 fastify.register(authRoutes);

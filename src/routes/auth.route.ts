@@ -6,10 +6,34 @@ import {
   getAuthenticatedUser,
   editUser,
   changePassword,
+  sendResetPasswordEmail,
+  validateResetPasswordSession,
+  resetPassword,
 } from '../controllers/auth.controller';
 
 export default async function authRoutes(server: FastifyInstance) {
   server.post('/api/v1/auth/register', registerUser);
+
+  server.post('/api/v1/auth/reset-password', sendResetPasswordEmail);
+
+  server.get<{
+    Querystring: {
+      email: string;
+      token: string;
+    };
+  }>(
+    '/api/v1/auth/validate-reset-password-session',
+    validateResetPasswordSession
+  );
+
+  server.patch<{
+    Body: {
+      newPassword: string;
+      token: string;
+      email: string;
+    };
+  }>('/api/v1/auth/reset-password', resetPassword);
+
   server.post('/api/v1/auth/login', loginUser);
   server.post(
     '/api/v1/auth/logout',
