@@ -395,7 +395,6 @@ export const resetPassword = async (
   reply: FastifyReply
 ) => {
   try {
-    const userCollection = getUserCollection(request.server);
     const { email, newPassword, token } = request.body;
 
     if (!email || !token) {
@@ -410,23 +409,28 @@ export const resetPassword = async (
         .send(errorResponse('New password is required', 400));
     }
 
+    const userCollection = getUserCollection(request.server);
     const user = await userCollection.findOne({ email });
 
     if (!user) {
       return reply.status(404).send(errorResponse('User is not found', 404));
     }
 
-    if (
-      user.resetPasswordToken !== token ||
-      user.resetPasswordExpires < dayjs().unix()
-    ) {
+    const currentTime = dayjs().unix();
+    const isTokenMismatch = user.resetPasswordToken !== token;
+    const isExpired = user.resetPasswordExpires < currentTime;
+
+    if (isTokenMismatch || isExpired) {
       await userCollection.updateOne(
         { email },
         {
-          $unset: { resetPasswordToken: '', resetPasswordExpires: '' },
+          $unset: {
+            resetPasswordToken: '',
+            resetPasswordExpires: '',
+          },
         }
       );
-      return reply.status(400).send(errorResponse('Invalid session', 404));
+      return reply.status(400).send(errorResponse('Invalid session', 400));
     }
 
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
@@ -434,8 +438,14 @@ export const resetPassword = async (
     await userCollection.updateOne(
       { email },
       {
-        $set: { password: hashedNewPassword, lastModifietAt: dayjs().unix() },
-        $unset: { resetPasswordToken: '', resetPasswordExpires: '' },
+        $set: {
+          password: hashedNewPassword,
+          lastModifiedAt: currentTime,
+        },
+        $unset: {
+          resetPasswordToken: '',
+          resetPasswordExpires: '',
+        },
       }
     );
 
@@ -443,13 +453,12 @@ export const resetPassword = async (
       .status(200)
       .send(
         successResponse(
-          "Password updated successfully, you'll be redirect to sign in page in a second",
+          "Password updated successfully, you'll be redirected to sign in page in a second",
           200
         )
       );
   } catch (error) {
     console.error('Failed to change password:', error);
-
     return reply.status(500).send(errorResponse('Internal Server Error', 500));
   }
 };
