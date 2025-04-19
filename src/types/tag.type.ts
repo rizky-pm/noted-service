@@ -8,6 +8,6 @@ export interface ITag {
 }
 
 export interface ICreateNewTag {
-  title: string;
+  name: string;
   color: 'red' | 'yellow' | 'green' | 'blue';
 }

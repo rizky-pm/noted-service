@@ -14,15 +14,15 @@ export const createNewTag = async (
 ) => {
   try {
     const userId = request.session.user.id;
-    const { title, color } = request.body;
+    const { name, color } = request.body;
     const tagsCollection = getTagCollection(request.server);
 
-    if (!title) {
+    if (!name) {
       return reply.status(400).send({ error: 'Tag name is required' });
     }
 
     const existingTag = await tagsCollection.findOne({
-      label: _.capitalize(title),
+      label: _.capitalize(name),
       createdBy: new ObjectId(userId),
     });
 
@@ -31,8 +31,8 @@ export const createNewTag = async (
     }
 
     const newTag = await tagsCollection.insertOne({
-      label: _.capitalize(title),
-      code: _.kebabCase(title),
+      label: _.capitalize(name),
+      code: _.kebabCase(name),
       color,
       createdAt: dayjs().unix(),
       updatedAt: dayjs().unix(),
@@ -57,27 +57,98 @@ export const deleteTagById = async (
     const userId = request.session.user.id;
     const { tagId } = request.params;
     const tagsCollection = getTagCollection(request.server);
+    const noteCollection = getNoteCollection(request.server);
 
     const tag = await tagsCollection.findOne({ _id: new ObjectId(tagId) });
 
     if (!tag) {
-      return reply.status(404).send(errorResponse('Tag not founds', 404));
+      return reply.status(404).send(errorResponse('Tag not found', 404));
     }
 
-    if (tag.createdBy.toString() === userId) {
-      await tagsCollection.deleteOne({ _id: new ObjectId(tagId) });
-    } else {
+    if (tag.createdBy.toString() !== userId) {
       return reply
         .status(403)
         .send(errorResponse('You are not authorized to delete this tag', 403));
     }
 
+    await tagsCollection.deleteOne({ _id: new ObjectId(tagId) });
+    await noteCollection.deleteMany({ tagId: new ObjectId(tagId) });
+
     return reply
       .status(200)
-      .send(successResponse('Tag deleted successfully', 200));
+      .send(successResponse('Tag and related notes deleted successfully', 200));
   } catch (error) {
     console.error(error);
     return reply.status(500).send(errorResponse());
+  }
+};
+
+export const editTagById = async (
+  request: FastifyRequest<{
+    Body: {
+      tagId: string;
+      name?: string;
+      color?: string;
+    };
+  }>,
+  reply: FastifyReply
+) => {
+  try {
+    const { tagId, color, name } = request.body;
+    const tagCollection = getTagCollection(request.server);
+
+    if (!tagId) {
+      return reply.status(400).send(errorResponse('Tag id is required', 400));
+    }
+
+    const tagToBeUpdated = await tagCollection.findOne({
+      _id: new ObjectId(tagId),
+    });
+
+    if (!tagToBeUpdated) {
+      return reply
+        .status(REQUEST_ERROR.notFound.code)
+        .send(errorResponse('Tag not found', REQUEST_ERROR.notFound.code));
+    }
+
+    const isTagNameAlreadyExist = await tagCollection.findOne({
+      code: _.kebabCase(name),
+    });
+
+    if (isTagNameAlreadyExist) {
+      return reply
+        .status(409)
+        .send(errorResponse(`${name} tag is already exist`, 409));
+    }
+
+    const updatedFields: Partial<{
+      label: string;
+      code: string;
+      color: string;
+      updatedAt: number;
+    }> = {
+      updatedAt: dayjs().unix(),
+    };
+
+    if (name !== undefined) {
+      updatedFields.label = _.capitalize(name);
+      updatedFields.code = _.kebabCase(name);
+    }
+    if (color !== undefined) updatedFields.color = color;
+
+    const updateTag = await tagCollection.updateOne(
+      { _id: new ObjectId(tagId) },
+      { $set: updatedFields }
+    );
+
+    return reply
+      .status(200)
+      .send(successResponse('Success edit tag', 200, updateTag.modifiedCount));
+  } catch (error) {
+    console.error(error);
+    return reply
+      .status(REQUEST_ERROR.internalError.code)
+      .send(errorResponse(undefined, REQUEST_ERROR.internalError.code));
   }
 };
 
