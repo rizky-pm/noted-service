@@ -56,7 +56,7 @@ fastify.get('/check-health', async (request, reply) => {
   );
 });
 
-fastify.listen({ port: 8080 }, (err, address) => {
+fastify.listen({ port: 3000 }, (err, address) => {
   if (err) {
     console.error(err);
     process.exit(1);
