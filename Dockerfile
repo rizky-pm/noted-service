@@ -4,9 +4,6 @@ FROM node:slim
 # Setting up the work directory
 WORKDIR /app
 
-# Declaring env
-ENV NODE_ENV development
-
 # COPY package.json
 COPY package.json /app
 
